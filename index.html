@@ -1,252 +1,994 @@
-<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><title>沙子俄罗斯方块 By DeepSeek</title><style>:root{--bg:#1a1a2e;--gold:#e8c170;--safe-bottom:env(safe-area-inset-bottom,8px)}*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);font-family:'Segoe UI',system-ui,sans-serif;touch-action:manipulation;user-select:none;height:100vh;height:100dvh;display:flex;justify-content:center;align-items:center;overflow:hidden}.game-wrapper{display:flex;flex-direction:column;align-items:center;width:100%;max-width:360px;height:100vh;height:100dvh;padding:6px 8px;padding-bottom:calc(var(--safe-bottom) + 6px);gap:4px;box-sizing:border-box}.game-header{display:flex;align-items:center;justify-content:space-between;width:100%;padding:0 8px;flex-shrink:0}.game-title{font-size:1.2em;font-weight:700;color:var(--gold)}.score-value{font-size:1.4em;font-weight:700;color:#fff}.canvas-container{position:relative;flex:1 1 auto;min-height:0;display:flex;justify-content:center;align-items:center;background:#0d0d15;border-radius:16px;overflow:hidden;box-shadow:0 0 0 2px #3a2a1a;width:100%}canvas#gameCanvas{display:block;max-width:100%;max-height:100%;border-radius:12px}.preview-box{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);border-radius:8px;padding:4px;z-index:5}canvas#previewCanvas{display:block;width:50px;height:36px}.touch-controls{display:flex;gap:5px;width:100%;flex-shrink:0;padding:2px 0}.touch-btn{flex:1 1 0;min-width:45px;height:46px;border-radius:12px;border:2px solid #3a2a1a;background:#1e150c;color:#d4a574;font-size:1.2em;display:flex;align-items:center;justify-content:center;touch-action:manipulation}.touch-btn:active{background:#3a2510;transform:scale(0.94)}.touch-btn.drop-btn{flex:1.8;font-weight:700;background:#2a1808;color:#ffc870}.overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:16px;z-index:20;backdrop-filter:blur(4px)}.overlay.hidden{opacity:0;pointer-events:none}.overlay-content{text-align:center;color:#f0e0c0;max-width:280px}.overlay-content h1{font-size:1.8em;color:#f8c870;margin-bottom:6px}.controls-guide{margin-top:12px;font-size:0.72em;color:#c0b090;line-height:1.6}.controls-guide span{display:block;margin-bottom:4px}.controls-guide .key-icon{display:inline-block;background:#2a1f14;border:1px solid #5a4a3a;border-radius:3px;padding:0 4px;font-family:monospace;color:#ffd580;margin:0 1px}.start-btn,.restart-btn{padding:10px 28px;border-radius:25px;border:2px solid #b08030;background:#4a2a10;color:#ffd580;font-size:1em;margin-top:12px}.controls-hint{display:none;font-size:0.65em;color:#7a6a5a;text-align:center;margin-top:2px}@media(min-width:500px){.controls-hint{display:block}}</style></head><body><div class="game-wrapper"><div class="game-header"><div class="game-title">🏜️🇷🇺🧱</div><div class="score-panel"><span class="score-value" id="scoreDisplay">0</span></div></div><div class="canvas-container" id="canvasContainer"><canvas id="gameCanvas"></canvas><div class="preview-box"><canvas id="previewCanvas"></canvas></div><div class="overlay" id="startOverlay"><div class="overlay-content"><h1> 沙子俄罗斯方块</h1><p>同色连通块从左到右即消除</p><div class="controls-guide"><span>⌨️ <strong>键盘</strong>：<span class="key-icon">←→</span> 移动 · <span class="key-icon">↑</span> 旋转 · <span class="key-icon">↓</span> 软降 · <span class="key-icon">空格</span> 硬降 · <span class="key-icon">R</span> 重启</span><span>🎮 <strong>手柄</strong>：方向键移动 · <span class="key-icon">A</span> 旋转 · <span class="key-icon">B</span> 软降 · <span class="key-icon">X/LB</span> 硬降 · <span class="key-icon">Start</span> 重启</span><span>📱 <strong>触屏</strong>：使用下方按钮操控</span></div><button class="start-btn" id="startBtn">开始游戏</button></div></div><div class="overlay hidden" id="gameOverOverlay"><div class="overlay-content"><h1>游戏结束</h1><button class="restart-btn" id="restartBtn">🔄 再来一局</button></div></div></div><div class="touch-controls"><button class="touch-btn" id="btnLeft">◀</button><button class="touch-btn" id="btnRotate">↻</button><button class="touch-btn drop-btn" id="btnDrop">▼硬降</button><button class="touch-btn" id="btnDown">▼</button><button class="touch-btn" id="btnRight">▶</button></div><div class="controls-hint">⌨️ 方向键/WASD · 空格硬降 · R 重启</div></div><script>
-(function(){
-const W=320,H=640,PS=4,COLS=80,ROWS=160,CELL=8,GC=10,GR=20;
-const DI=700,DM=80,SD=45,SL=15;
-const CL=[[0xF4,0x43,0x36],[0xC0,0xC0,0xC0],[0x4C,0xAF,0x50],[0x21,0x96,0xF3]];
-const SH=[
-{n:'I',c:[[0,0],[1,0],[2,0],[3,0]],w:4,h:1},
-{n:'O',c:[[0,0],[1,0],[0,1],[1,1]],w:2,h:2},
-{n:'T',c:[[1,0],[0,1],[1,1],[2,1]],w:3,h:2},
-{n:'S',c:[[1,0],[2,0],[0,1],[1,1]],w:3,h:2},
-{n:'Z',c:[[0,0],[1,0],[1,1],[2,1]],w:3,h:2},
-{n:'J',c:[[0,0],[0,1],[1,1],[2,1]],w:3,h:2},
-{n:'L',c:[[2,0],[0,1],[1,1],[2,1]],w:3,h:2}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#1a1a2e">
+<title>沙子俄罗斯方块 By DeepSeek</title>
+<style>
+:root{
+  --bg:#1a1a2e;
+  --gold:#e8c170;
+  --safe-bottom:env(safe-area-inset-bottom,8px)
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:var(--bg);
+  font-family:'Segoe UI',system-ui,sans-serif;
+  touch-action:manipulation;
+  user-select:none;
+  -webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  height:100vh;
+  height:100dvh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  overflow:hidden
+}
+.game-wrapper{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  width:100%;
+  max-width:360px;
+  height:100vh;
+  height:100dvh;
+  padding:6px 8px;
+  padding-bottom:calc(var(--safe-bottom) + 6px);
+  gap:4px;
+  box-sizing:border-box
+}
+.game-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  width:100%;
+  padding:0 8px;
+  flex-shrink:0
+}
+.game-title{font-size:1.2em;font-weight:700;color:var(--gold)}
+.score-panel{display:flex;align-items:baseline;gap:4px}
+.score-best{font-size:.62em;color:#7a6a5a}
+.score-value{
+  font-size:1.4em;
+  font-weight:700;
+  color:#fff;
+  display:inline-block;
+  transition:transform .12s ease-out,color .12s ease-out
+}
+.score-value.score-pop{transform:scale(1.35);color:#ffd580}
+.canvas-container{
+  position:relative;
+  flex:1 1 auto;
+  min-height:0;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  background:#0d0d15;
+  border-radius:16px;
+  overflow:hidden;
+  box-shadow:0 0 0 2px #3a2a1a;
+  width:100%
+}
+canvas#gameCanvas{
+  display:block;
+  max-width:100%;
+  max-height:100%;
+  border-radius:12px;
+  /* 画布被 CSS 放大时保持像素锐利 */
+  image-rendering:pixelated;
+  image-rendering:crisp-edges
+}
+.preview-box{
+  position:absolute;
+  top:8px;
+  right:8px;
+  background:rgba(0,0,0,.6);
+  border-radius:8px;
+  padding:4px;
+  z-index:5
+}
+canvas#previewCanvas{display:block;width:50px;height:36px}
+.touch-controls{
+  display:flex;
+  gap:5px;
+  width:100%;
+  flex-shrink:0;
+  padding:2px 0
+}
+.touch-btn{
+  flex:1 1 0;
+  min-width:45px;
+  height:46px;
+  border-radius:12px;
+  border:2px solid #3a2a1a;
+  background:#1e150c;
+  color:#d4a574;
+  font-size:1.2em;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  touch-action:manipulation;
+  user-select:none;
+  -webkit-user-select:none;
+  cursor:pointer
+}
+.touch-btn:active{background:#3a2510;transform:scale(.94)}
+.touch-btn.drop-btn{flex:1.8;font-weight:700;background:#2a1808;color:#ffc870}
+.overlay{
+  position:absolute;
+  top:0;left:0;
+  width:100%;height:100%;
+  background:rgba(0,0,0,.75);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  border-radius:16px;
+  z-index:20;
+  backdrop-filter:blur(4px);
+  transition:opacity .18s ease-out
+}
+.overlay.hidden{opacity:0;pointer-events:none;visibility:hidden}
+.overlay-content{text-align:center;color:#f0e0c0;max-width:280px;padding:0 16px}
+.overlay-content h1{font-size:1.8em;color:#f8c870;margin-bottom:6px}
+.overlay-content p{font-size:.85em;color:#c0b090}
+.final-score{font-size:.95em;color:#fff;margin-top:10px}
+.final-score b{color:#ffd580;font-size:1.3em}
+.controls-guide{margin-top:12px;font-size:.72em;color:#c0b090;line-height:1.6}
+.controls-guide span{display:block;margin-bottom:4px}
+.controls-guide .key-icon{
+  display:inline-block;
+  background:#2a1f14;
+  border:1px solid #5a4a3a;
+  border-radius:3px;
+  padding:0 4px;
+  font-family:monospace;
+  color:#ffd580;
+  margin:0 1px
+}
+.start-btn,.restart-btn{
+  padding:10px 28px;
+  border-radius:25px;
+  border:2px solid #b08030;
+  background:#4a2a10;
+  color:#ffd580;
+  font-size:1em;
+  margin-top:12px;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent
+}
+.start-btn:active,.restart-btn:active{background:#6a3a14;transform:scale(.96)}
+.controls-hint{display:none;font-size:.65em;color:#7a6a5a;text-align:center;margin-top:2px}
+@media(min-width:500px){.controls-hint{display:block}}
+</style>
+</head>
+<body>
+<div class="game-wrapper">
+  <div class="game-header">
+    <div class="game-title">🏜️🇷🇺🧱</div>
+    <div class="score-panel">
+      <span class="score-best" id="bestDisplay"></span>
+      <span class="score-value" id="scoreDisplay">0</span>
+    </div>
+  </div>
+
+  <div class="canvas-container" id="canvasContainer">
+    <canvas id="gameCanvas"></canvas>
+    <div class="preview-box"><canvas id="previewCanvas"></canvas></div>
+
+    <div class="overlay" id="startOverlay">
+      <div class="overlay-content">
+        <h1>🏜️ 沙子俄罗斯方块</h1>
+        <p>同色连通块从左到右即消除</p>
+        <div class="controls-guide">
+          <span>⌨️ <strong>键盘</strong>：<span class="key-icon">←→</span> 移动 · <span class="key-icon">↑</span> 旋转 · <span class="key-icon">↓</span> 软降 · <span class="key-icon">空格</span> 硬降 · <span class="key-icon">P</span> 暂停 · <span class="key-icon">R</span> 重启</span>
+          <span>🎮 <strong>手柄</strong>：方向键移动 · <span class="key-icon">A</span> 旋转 · <span class="key-icon">B</span> 软降 · <span class="key-icon">X/LB</span> 硬降 · <span class="key-icon">Start</span> 重启</span>
+          <span>📱 <strong>触屏</strong>：使用下方按钮操控</span>
+        </div>
+        <button class="start-btn" id="startBtn">开始游戏</button>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="pauseOverlay">
+      <div class="overlay-content">
+        <h1>⏸ 已暂停</h1>
+        <p>点击任意位置继续</p>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="gameOverOverlay">
+      <div class="overlay-content">
+        <h1>游戏结束</h1>
+        <div class="final-score">本局得分 <b id="finalScore">0</b><br><span id="bestLine"></span></div>
+        <button class="restart-btn" id="restartBtn">🔄 再来一局</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="touch-controls">
+    <button class="touch-btn" id="btnLeft" aria-label="左移">◀</button>
+    <button class="touch-btn" id="btnRotate" aria-label="旋转">↻</button>
+    <button class="touch-btn drop-btn" id="btnDrop" aria-label="硬降">▼硬降</button>
+    <button class="touch-btn" id="btnDown" aria-label="软降">▼</button>
+    <button class="touch-btn" id="btnRight" aria-label="右移">▶</button>
+  </div>
+  <div class="controls-hint">⌨️ 方向键/WASD · 空格硬降 · P 暂停 · R 重启</div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+/* ==========================================================================
+   沙子俄罗斯方块 —— 优化版
+   --------------------------------------------------------------------------
+   玩法与原版一致：4 色粒子、沙子沉降、同色块从左边缘连通到右边缘才消除。
+   优化集中在三处：
+     1) 渲染：原版每帧重建 320×640 ImageData 并新分配 800KB 缓冲；
+        现改为复用缓冲 + Uint32 视图 + 脏单元格增量重绘。
+     2) 物理：原版每 15ms 无脑全盘扫描；现改为静止即休眠（sandDirty）。
+     3) 消除：复用访问数组与队列，不再每次 new Uint8Array / new Set / new Array。
+   ========================================================================== */
+
+/* ---------------------------------------------------------------- 1. 常量 */
+
+var W = 320, H = 640;          // 画布像素
+var PS = 4;                    // 每个粒子的像素边长
+var COLS = 80, ROWS = 160;     // 粒子网格
+var CELL = 8;                  // 一个方块格 = 8×8 粒子
+var GC = 10, GR = 20;          // 逻辑格数
+var NCOL = 4;                  // 颜色数
+
+var DROP_INIT = 700;           // 初始下落间隔 ms
+var DROP_MIN = 80;             // 最快下落间隔
+var SOFT_DROP = 45;            // 软降间隔
+var SIM_MS = 15;               // 沙子物理步长
+
+var SHADES = 16;               // 每色明暗档数（代替逐格浮点运算）
+
+var COLORS = [
+  [0xF4, 0x43, 0x36],          // 红
+  [0xC0, 0xC0, 0xC0],          // 银
+  [0x4C, 0xAF, 0x50],          // 绿
+  [0x21, 0x96, 0xF3]           // 蓝
 ];
-const ca=document.getElementById('gameCanvas'),ct=ca.getContext('2d');
-const pr=document.getElementById('previewCanvas'),pt=pr.getContext('2d');
-ca.width=W;ca.height=H;pr.width=64;pr.height=48;
-const g=new Uint32Array(COLS*ROWS),E=0;
-const gi=(x,y)=>y*COLS+x;
-const gp=(x,y)=>(x<0||x>=COLS||y<0||y>=ROWS)?0xFFFFFFFF:g[gi(x,y)];
-const sp=(x,y,v)=>{if(x>=0&&x<COLS&&y>=0&&y<ROWS)g[gi(x,y)]=v;};
-const cl=(x,y)=>{if(x>=0&&x<COLS&&y>=0&&y<ROWS)g[gi(x,y)]=E;};
-const io=(x,y)=>(gp(x,y)!==E);
-const pk=(c,r,g,b)=>((c+1)<<24)|(b<<16)|(g<<8)|r;
-const up=(v)=>({r:v&0xFF,g:(v>>8)&0xFF,b:(v>>16)&0xFF,c:((v>>24)&0xFF)-1});
-const rc=()=>{let i=Math.random()*CL.length|0;const[r,g,b]=CL[i];return pk(i,r,g,b);};
-let bag=[];
-const ns=()=>{
-if(bag.length===0){bag=[0,1,2,3,4,5,6];for(let i=6;i>0;i--){let j=Math.random()*(i+1)|0;[bag[i],bag[j]]=[bag[j],bag[i]];}}
-return SH[bag.pop()];
-};
-const rCW=(s)=>{
-let nc=s.c.map(([cx,cy])=>[s.h-1-cy,cx]);
-let minX=Math.min(...nc.map(c=>c[0])),minY=Math.min(...nc.map(c=>c[1])),maxX=Math.max(...nc.map(c=>c[0])),maxY=Math.max(...nc.map(c=>c[1]));
-return{...s,c:nc.map(([cx,cy])=>[cx-minX,cy-minY]),w:maxX-minX+1,h:maxY-minY+1};
-};
-const shP=(s,gx,gy)=>{
-let pos=[],px=gx*CELL,py=gy*CELL;
-for(const[cx,cy] of s.c){let cp=px+cx*CELL,cpy=py+cy*CELL;for(let dy=0;dy<CELL;dy++)for(let dx=0;dx<CELL;dx++)pos.push(cp+dx,cpy+dy);}
-return pos;
-};
-const col=(s,gx,gy)=>{
-let pos=shP(s,gx,gy);
-for(let i=0;i<pos.length;i+=2){let x=pos[i],y=pos[i+1];if(x<0||x>=COLS||y>=ROWS)return true;if(y<0)continue;if(io(x,y))return true;}
-return false;
-};
-const cp=(s,gx,gy)=>!col(s,gx,gy);
-const elim=()=>{
-let cs=new Set();
-for(let i=0;i<g.length;i++)if(g[i]!==E)cs.add((g[i]>>24)&0xFF);
-let any=false,dirs=[1,0,-1,0,0,1,0,-1,1,1,-1,-1,1,-1,-1,1];
-for(let cat of cs){
-let hasL=false;
-for(let y=0;y<ROWS;y++){let v=gp(0,y);if(v!==E&&((v>>24)&0xFF)===cat){hasL=true;break;}}
-if(!hasL)continue;
-let vis=new Uint8Array(COLS*ROWS),q=[],head=0;
-for(let y=0;y<ROWS;y++)if(gp(0,y)!==E&&((gp(0,y)>>24)&0xFF)===cat){let i=gi(0,y);vis[i]=1;q.push(0,y);}
-let reached=false;
-while(head<q.length&&!reached){
-let x=q[head++],y=q[head++];
-if(x===COLS-1){reached=true;break;}
-for(let d=0;d<8;d++){
-let nx=x+dirs[d*2],ny=y+dirs[d*2+1];
-if(nx<0||nx>=COLS||ny<0||ny>=ROWS)continue;
-let v=gp(nx,ny);
-if(v===E)continue;
-if(((v>>24)&0xFF)!==cat)continue;
-let ni=gi(nx,ny);
-if(!vis[ni]){vis[ni]=1;q.push(nx,ny);}
+
+/* 打包成 canvas 像素；小端机器上的 32 位值 = 0xAABBGGRR */
+function packRGB(r, g, b, a) {
+  if (a === undefined) a = 255;
+  return ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
 }
-}
-if(reached){
-let cnt=0;
-for(let i=0;i<g.length;i++){if(vis[i]&&g[i]!==E){g[i]=E;cnt++;}}
-if(cnt>0){sc+=cnt*10;us();any=true;}
-}
-}
-return any;
-};
-let ac=null,nd=null,nc=null,sc=0,rn=false,ov=false;
-let di=DI;
-const spw=()=>{
-if(!nd){nd=ns();nc=rc();}
-let s=nd,co=nc;nd=ns();nc=rc();
-let gx=((GC-s.w)/2)|0,gy=0;
-if(!cp(s,gx,gy)){ov=true;rn=false;so();return null;}
-return{s,gx,gy,co};
-};
-const lk=()=>{
-if(!ac)return;
-let{s,gx,gy,co}=ac,pos=shP(s,gx,gy);
-for(let i=0;i<pos.length;i+=2)sp(pos[i],pos[i+1],co);
-ac=null;elim();ac=spw();
-};
-const hd=()=>{if(!ac||!rn)return;let{s,gx,gy}=ac;while(cp(s,gx,gy+1))gy++;ac.gy=gy;lk();};
-const sd=()=>{if(!ac||!rn)return false;if(cp(ac.s,ac.gx,ac.gy+1)){ac.gy++;return true;}return false;};
-const mv=(dx)=>{if(!ac||!rn)return false;if(cp(ac.s,ac.gx+dx,ac.gy)){ac.gx+=dx;return true;}return false;};
-const rot=()=>{
-if(!ac||!rn)return false;
-let{s,gx,gy}=ac;
-if(s.n==='O')return true;
-let rs=rCW(s);
-if(cp(rs,gx,gy)){ac.s=rs;return true;}
-for(let k of[1,-1,2,-2,3,-3,0]){
-if(cp(rs,gx+k,gy)){ac.s=rs;ac.gx+=k;return true;}
-if(cp(rs,gx+k,gy-1)){ac.s=rs;ac.gx+=k;ac.gy-=1;return true;}
-}
-return false;
-};
-const us=()=>{scoreDisplay.textContent=sc;scoreDisplay.classList.add('score-pop');setTimeout(()=>scoreDisplay.classList.remove('score-pop'),350);};
-const so=()=>{gameOverOverlay.classList.remove('hidden');};
-const ho=()=>{gameOverOverlay.classList.add('hidden');};
-const rst=()=>{
-g.fill(E);sc=0;di=DI;rn=true;ov=false;bag=[];
-nd=null;nc=null;ac=null;ho();us();
-nd=ns();nc=rc();ac=spw();
-if(!ac){ov=true;rn=false;so();}
-};
-const sim=()=>{
-let moved=false;
-for(let y=ROWS-2;y>=0;y--){
-for(let x=0;x<COLS;x++){
-let v=gp(x,y);if(v===E)continue;
-if(!io(x,y+1)){sp(x,y+1,v);cl(x,y);moved=true;}
-else{
-let lf=x>0&&!io(x-1,y+1),rf=x<COLS-1&&!io(x+1,y+1);
-if(lf&&rf){Math.random()<0.5?sp(x-1,y+1,v):sp(x+1,y+1,v);cl(x,y);moved=true;}
-else if(lf){sp(x-1,y+1,v);cl(x,y);moved=true;}
-else if(rf){sp(x+1,y+1,v);cl(x,y);moved=true;}
-}
-}
-}
-if(moved)elim();
-};
-const rp=()=>{
-pt.clearRect(0,0,64,48);
-if(!nd||nc===null)return;
-let{r,g,b}=up(nc);pt.fillStyle=`rgb(${r},${g},${b})`;
-let cs=10,tw=nd.w*cs,th=nd.h*cs,ox=(64-tw)/2,oy=(48-th)/2;
-for(const[cx,cy]of nd.c)pt.fillRect(ox+cx*cs+1,oy+cy*cs+1,cs-2,cs-2);
-};
-const rd=()=>{
-let img=ct.createImageData(W,H),d=img.data;
-for(let i=0;i<d.length;i+=4){d[i]=13;d[i+1]=13;d[i+2]=21;d[i+3]=255;}
-for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(((x*31)^(y*17))%37===0){let i=(y*PS*W+x*PS)*4;d[i]+=12;d[i+1]+=12;d[i+2]+=18;}
-for(let y=0;y<ROWS;y++)if(y%CELL===0){let py=y*PS;for(let x=0;x<W;x++){let i=(py*W+x)*4;d[i]+=18;d[i+1]+=18;d[i+2]+=22;}}
-for(let x=0;x<COLS;x++)if(x%CELL===0){let px=x*PS;for(let y=0;y<H;y++){let i=(y*W+px)*4;d[i]+=18;d[i+1]+=18;d[i+2]+=22;}}
-for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
-let v=gp(x,y);if(v===E)continue;
-let{r,g,b}=up(v),px=x*PS,py=y*PS;
-let hash=((x*13)^(y*7))&15,br=0.92+hash/15*0.16;
-let sr=Math.min(255,Math.round(r*br)),sg=Math.min(255,Math.round(g*br)),sb=Math.min(255,Math.round(b*br));
-for(let dy=0;dy<PS;dy++)for(let dx=0;dx<PS;dx++){let i=((py+dy)*W+(px+dx))*4;d[i]=sr;d[i+1]=sg;d[i+2]=sb;}
-}
-if(ac&&rn){
-let gy=ac.gy;while(cp(ac.s,ac.gx,gy+1))gy++;
-if(gy!==ac.gy){
-let gp2=shP(ac.s,ac.gx,gy);
-for(let i=0;i<gp2.length;i+=2){
-let x=gp2[i],y=gp2[i+1];if(x<0||x>=COLS||y<0||y>=ROWS||io(x,y))continue;
-let px=x*PS,py=y*PS;
-for(let dy=0;dy<PS;dy++)for(let dx=0;dx<PS;dx++){let idx=((py+dy)*W+(px+dx))*4;d[idx]=Math.min(255,d[idx]+50);d[idx+1]=Math.min(255,d[idx+1]+50);d[idx+2]=Math.min(255,d[idx+2]+55);}
-}
-}
-let ap=shP(ac.s,ac.gx,ac.gy),{r,g,b}=up(ac.co);
-for(let i=0;i<ap.length;i+=2){
-let x=ap[i],y=ap[i+1];if(x<0||x>=COLS||y<0||y>=ROWS)continue;
-let px=x*PS,py=y*PS;
-for(let dy=0;dy<PS;dy++)for(let dx=0;dx<PS;dx++){let idx=((py+dy)*W+(px+dx))*4;d[idx]=r;d[idx+1]=g;d[idx+2]=b;}
-if((x===0||!io(x-1,y))||(x===COLS-1||!io(x+1,y))||(y===0||!io(x,y-1))||(y===ROWS-1||!io(x,y+1))){
-for(let dy=0;dy<PS;dy++)for(let dx=0;dx<PS;dx++)if(dx===0||dx===PS-1||dy===0||dy===PS-1){let i2=((py+dy)*W+(px+dx))*4;d[i2]=Math.min(255,d[i2]+55);d[i2+1]=Math.min(255,d[i2+1]+55);d[i2+2]=Math.min(255,d[i2+2]+55);}
-}
-}
-}
-ct.putImageData(img,0,0);rp();
-};
-const ks={},kt={};
-const skr=(key,fn,id=160,rd=55)=>{ckr(key);kt[key]={i:setTimeout(()=>{kt[key].r=setInterval(fn,rd)},id),r:null};};
-const ckr=(key)=>{if(kt[key]){clearTimeout(kt[key].i);clearInterval(kt[key].r);delete kt[key];}};
-const okd=(e)=>{
-if(!rn&&e.key!=='r'&&e.key!=='R'&&e.key!=='Enter')return;
-if((e.key==='r'||e.key==='R'||e.key==='Enter')&&ov){rst();return;}
-if(ks[e.key])return;ks[e.key]=true;
-switch(e.key){
-case'ArrowLeft':case'a':case'A':e.preventDefault();mv(-1);skr(e.key,()=>mv(-1));break;
-case'ArrowRight':case'd':case'D':e.preventDefault();mv(1);skr(e.key,()=>mv(1));break;
-case'ArrowDown':case's':case'S':e.preventDefault();if(ac&&rn){di=SD;da=di;}break;
-case'ArrowUp':case'w':case'W':e.preventDefault();rot();break;
-case' ':e.preventDefault();hd();break;
-}
-};
-const oku=(e)=>{ks[e.key]=false;ckr(e.key);if(e.key==='ArrowDown'||e.key==='s'||e.key==='S')di=Math.max(DM,DI-sc*0.3);};
-document.addEventListener('keydown',okd);document.addEventListener('keyup',oku);
-const st=(id,fn,rep)=>{
-let b=document.getElementById(id);if(!b)return;let t=null;
-b.addEventListener('pointerdown',(e)=>{e.preventDefault();fn();if(rep){t=setTimeout(()=>{t=setInterval(rep,55)},160);}});
-let clr=()=>{if(t){clearTimeout(t);clearInterval(t);t=null;}};
-b.addEventListener('pointerup',clr);b.addEventListener('pointerleave',clr);
-};
-st('btnLeft',()=>mv(-1),()=>mv(-1));
-st('btnRight',()=>mv(1),()=>mv(1));
-st('btnRotate',()=>rot());
-st('btnDrop',()=>hd());
-st('btnDown',()=>{if(ac&&rn){di=SD;da=di;}},()=>{if(ac&&rn)sd();});
-let bd=document.getElementById('btnDown');
-if(bd)bd.addEventListener('pointerup',()=>di=Math.max(DM,DI-sc*0.3));
-const gs={lp:false,rp:false,dp:false,rp:false,hd:false,rst:false};
-const hgi=()=>{
-let gps=navigator.getGamepads?navigator.getGamepads():[];
-for(let gp of gps){
-if(!gp)continue;
-let ax=gp.axes[0]||0,dl=gp.buttons[14]?.pressed||false,dr=gp.buttons[15]?.pressed||false,dd=gp.buttons[13]?.pressed||false,du=gp.buttons[12]?.pressed||false;
-let l=ax<-0.5||dl,r=ax>0.5||dr,dn=dd||gp.buttons[1]?.pressed,rt=du||gp.buttons[0]?.pressed,hd=gp.buttons[2]?.pressed||gp.buttons[4]?.pressed,rst=gp.buttons[9]?.pressed;
-if(!rn){
-if(rst&&!gs.rst){gs.rst=true;if(ov)rst();else if(!startOverlay.classList.contains('hidden'))sng();}
-else if(!rst)gs.rst=false;
-continue;
-}
-if(l&&!gs.lp){gs.lp=true;mv(-1);}else if(!l)gs.lp=false;
-if(r&&!gs.rp){gs.rp=true;mv(1);}else if(!r)gs.rp=false;
-if(rt&&!gs.rt){gs.rt=true;rot();}else if(!rt)gs.rt=false;
-if(hd&&!gs.hd){gs.hd=true;hd();}else if(!hd)gs.hd=false;
-if(dn&&ac){di=SD;da=di;}else if(!dn)di=Math.max(DM,DI-sc*0.3);
-if(rst&&!gs.rst){gs.rst=true;if(ov)rst();}else if(!rst)gs.rst=false;
-}
-};
-window.addEventListener('gamepadconnected',(e)=>console.log('手柄连接'));
-window.addEventListener('gamepaddisconnected',(e)=>console.log('手柄断开'));
-const sng=()=>{startOverlay.classList.add('hidden');rst();};
-const so2=document.getElementById('startOverlay');
-startBtn.addEventListener('click',sng);
-restartBtn.addEventListener('click',rst);
-ca.addEventListener('touchstart',(e)=>e.preventDefault());
-window.addEventListener('keydown',(e)=>{if([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();},{passive:false});
-so2.classList.remove('hidden');
-nd=ns();nc=rc();
-let lt=0,da=0,sa=0;
-const loop=(ts)=>{
-if(!lt)lt=ts;
-let dt=ts-lt;lt=ts;if(dt>200)dt=200;
-hgi();
-if(rn&&ac){
-da+=dt;
-while(da>=di){da-=di;if(!sd()){lk();if(ov)break;}}
-if(!ov){sa+=dt;while(sa>=SL){sa-=SL;sim();}}
-}else if(rn&&!ac&&!ov){ac=spw();if(!ac){ov=true;rn=false;so();}da=0;}
-rd();
-requestAnimationFrame(loop);
-};
-requestAnimationFrame(loop);
+
+var BG_R = 13, BG_G = 13, BG_B = 21;
+
+/* 预生成调色板：正常色 + 幽灵色（幽灵 = 35% 本色 + 65% 背景） */
+var PAL = new Uint32Array(NCOL * SHADES);
+var PAL_GHOST = new Uint32Array(NCOL * SHADES);
+(function buildPalette() {
+  for (var c = 0; c < NCOL; c++) {
+    var r = COLORS[c][0], g = COLORS[c][1], b = COLORS[c][2];
+    for (var s = 0; s < SHADES; s++) {
+      var br = 0.92 + (s / (SHADES - 1)) * 0.16;
+      PAL[c * SHADES + s] = packRGB(
+        Math.min(255, Math.round(r * br)),
+        Math.min(255, Math.round(g * br)),
+        Math.min(255, Math.round(b * br))
+      );
+      PAL_GHOST[c * SHADES + s] = packRGB(
+        Math.round(r * 0.35 + BG_R * 0.65),
+        Math.round(g * 0.35 + BG_G * 0.65),
+        Math.round(b * 0.35 + BG_B * 0.65)
+      );
+    }
+  }
 })();
-</script></body></html>
+
+/* ---------------------------------------------------------------- 2. 形状 */
+
+var SHAPES = [
+  { n: 'I', c: [[0, 0], [1, 0], [2, 0], [3, 0]], w: 4, h: 1 },
+  { n: 'O', c: [[0, 0], [1, 0], [0, 1], [1, 1]], w: 2, h: 2 },
+  { n: 'T', c: [[1, 0], [0, 1], [1, 1], [2, 1]], w: 3, h: 2 },
+  { n: 'S', c: [[1, 0], [2, 0], [0, 1], [1, 1]], w: 3, h: 2 },
+  { n: 'Z', c: [[0, 0], [1, 0], [1, 1], [2, 1]], w: 3, h: 2 },
+  { n: 'J', c: [[0, 0], [0, 1], [1, 1], [2, 1]], w: 3, h: 2 },
+  { n: 'L', c: [[2, 0], [0, 1], [1, 1], [2, 1]], w: 3, h: 2 }
+];
+
+/* 顺时针旋转 90° 并归一化到左上角 */
+function rotateShape(s) {
+  var nc = [], i, cx, cy;
+  var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  for (i = 0; i < s.c.length; i++) {
+    cx = s.h - 1 - s.c[i][1];
+    cy = s.c[i][0];
+    if (cx < minX) minX = cx;
+    if (cy < minY) minY = cy;
+    if (cx > maxX) maxX = cx;
+    if (cy > maxY) maxY = cy;
+    nc.push([cx, cy]);
+  }
+  var out = [];
+  for (i = 0; i < nc.length; i++) out.push([nc[i][0] - minX, nc[i][1] - minY]);
+  return { n: s.n, c: out, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+
+/* ---------------------------------------------------------------- 3. 状态 */
+
+var EMPTY = 0;
+var g = new Uint32Array(COLS * ROWS);   // 0 = 空，否则 1..NCOL
+
+var active = null;      // {s, gx, gy, co}
+var nextShape = null, nextColor = 0;
+var score = 0;
+var running = false, over = false, paused = false;
+var boardVersion = 0;   // 棋盘每次变动自增，用于幽灵缓存失效
+var sandDirty = false;  // 没有沙子可动时整帧跳过物理
+
+var bag = [];
+function nextFromBag() {
+  if (bag.length === 0) {
+    bag = [0, 1, 2, 3, 4, 5, 6];
+    for (var i = 6; i > 0; i--) {
+      var j = (Math.random() * (i + 1)) | 0;
+      var t = bag[i]; bag[i] = bag[j]; bag[j] = t;
+    }
+  }
+  return bag.pop();
+}
+function randomColor() { return ((Math.random() * NCOL) | 0) + 1; }
+
+/* ------------------------------------------------------- 4. 碰撞 / 锁定 */
+
+/* 逐粒子检测：形状每格对应一个 8×8 粒子块。
+   原版 shP() 每次调用都分配几百元素的数组，而它每帧被调多次 —— 这里彻底去掉分配。 */
+function collides(s, gx, gy) {
+  var cells = s.c;
+  for (var k = 0; k < cells.length; k++) {
+    var bx = (gx + cells[k][0]) * CELL;
+    var by = (gy + cells[k][1]) * CELL;
+    for (var dy = 0; dy < CELL; dy++) {
+      var y = by + dy;
+      if (y < 0) continue;
+      if (y >= ROWS) return true;
+      var rb = y * COLS;
+      for (var dx = 0; dx < CELL; dx++) {
+        var x = bx + dx;
+        if (x < 0 || x >= COLS) return true;
+        if (g[rb + x] !== EMPTY) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function fits(s, gx, gy) { return !collides(s, gx, gy); }
+
+/* 把当前方块写进棋盘 */
+function lockPiece() {
+  var s = active.s, gx = active.gx, gy = active.gy, co = active.co;
+  var cells = s.c;
+  for (var k = 0; k < cells.length; k++) {
+    var bx = (gx + cells[k][0]) * CELL;
+    var by = (gy + cells[k][1]) * CELL;
+    for (var dy = 0; dy < CELL; dy++) {
+      var y = by + dy;
+      if (y < 0 || y >= ROWS) continue;
+      var rb = y * COLS;
+      for (var dx = 0; dx < CELL; dx++) {
+        var x = bx + dx;
+        if (x < 0 || x >= COLS) continue;
+        g[rb + x] = co;
+      }
+    }
+  }
+  boardVersion++;
+  active = null;
+  elim();
+  sandDirty = true;         // 新落下的沙子继续沉降
+  spawn();
+}
+
+/* 生成下一个方块；顶到天花板就结束 */
+function spawn() {
+  var s = nextShape, co = nextColor;
+  nextShape = SHAPES[nextFromBag()];
+  nextColor = randomColor();
+  previewDirty = true;
+
+  var gx = ((GC - s.w) / 2) | 0;
+  if (!fits(s, gx, 0)) {
+    over = true; running = false;
+    showGameOver();
+    return;
+  }
+  active = { s: s, gx: gx, gy: 0, co: co };
+  ghostKey = -1;
+}
+
+/* 落点 */
+function ghostDropY() {
+  var gy = active.gy;
+  while (fits(active.s, active.gx, gy + 1)) gy++;
+  return gy;
+}
+
+function hardDrop() {
+  if (!active || !running || paused) return;
+  active.gy = ghostDropY();
+  lockPiece();
+}
+
+function softStep() {
+  if (!active || !running || paused) return false;
+  if (fits(active.s, active.gx, active.gy + 1)) { active.gy++; return true; }
+  return false;
+}
+
+function move(dx) {
+  if (!active || !running || paused) return false;
+  if (fits(active.s, active.gx + dx, active.gy)) {
+    active.gx += dx;
+    ghostKey = -1;
+    return true;
+  }
+  return false;
+}
+
+function rotate() {
+  if (!active || !running || paused) return false;
+  if (active.s.n === 'O') return true;
+  var rs = rotateShape(active.s);
+  var gx = active.gx, gy = active.gy;
+  if (fits(rs, gx, gy)) { active.s = rs; ghostKey = -1; return true; }
+  /* 墙踢：左右试探，再试上移一格 */
+  var kicks = [1, -1, 2, -2, 3, -3];
+  for (var i = 0; i < kicks.length; i++) {
+    var k = kicks[i];
+    if (fits(rs, gx + k, gy)) { active.s = rs; active.gx = gx + k; ghostKey = -1; return true; }
+    if (fits(rs, gx + k, gy - 1)) { active.s = rs; active.gx = gx + k; active.gy = gy - 1; ghostKey = -1; return true; }
+  }
+  return false;
+}
+
+/* ---------------------------------------------------------------- 5. 物理 */
+
+function simulate() {
+  if (!sandDirty) return;
+  var moved = false;
+  var y, x, rb, rd, v, lf, rf;
+  for (y = ROWS - 2; y >= 0; y--) {
+    rb = y * COLS;
+    rd = rb + COLS;
+    for (x = 0; x < COLS; x++) {
+      v = g[rb + x];
+      if (v === EMPTY) continue;
+      if (g[rd + x] === EMPTY) {
+        g[rd + x] = v; g[rb + x] = EMPTY; moved = true;
+      } else {
+        lf = x > 0 && g[rd + x - 1] === EMPTY;
+        rf = x < COLS - 1 && g[rd + x + 1] === EMPTY;
+        if (lf && rf) {
+          if (Math.random() < 0.5) g[rd + x - 1] = v; else g[rd + x + 1] = v;
+          g[rb + x] = EMPTY; moved = true;
+        } else if (lf) {
+          g[rd + x - 1] = v; g[rb + x] = EMPTY; moved = true;
+        } else if (rf) {
+          g[rd + x + 1] = v; g[rb + x] = EMPTY; moved = true;
+        }
+      }
+    }
+  }
+  if (moved) {
+    boardVersion++;
+    elim();
+    sandDirty = true;
+  } else {
+    sandDirty = false;
+  }
+}
+
+/* ---------------------------------------------------------------- 6. 消除 */
+
+var vis = new Uint8Array(COLS * ROWS);
+var qx = new Int16Array(COLS * ROWS);
+var qy = new Int16Array(COLS * ROWS);
+/* 8 邻域方向，必须与原版 dirs 完全一致：
+   (1,0) (-1,0) (0,1) (0,-1) (1,1) (-1,-1) (1,-1) (-1,1) */
+var DX = [1, -1, 0, 0, 1, -1, 1, -1];
+var DY = [0, 0, 1, -1, 1, -1, -1, 1];
+
+/* 同色连通块必须同时触到左、右边缘才消除（8 邻域） */
+function elim() {
+  var mask = 0, i, v;
+  for (i = 0; i < g.length; i++) {
+    v = g[i];
+    if (v !== EMPTY) mask |= 1 << (v - 1);
+  }
+  if (mask === 0) return false;
+
+  var any = false;
+  for (var c = 1; c <= NCOL; c++) {
+    if (!(mask & (1 << (c - 1)))) continue;
+
+    var hasLeft = false;
+    for (var y = 0; y < ROWS; y++) {
+      if (g[y * COLS] === c) { hasLeft = true; break; }
+    }
+    if (!hasLeft) continue;
+
+    /* 多源 BFS：左边缘上该颜色的粒子一起入队 */
+    vis.fill(0);
+    var head = 0, tail = 0;
+    for (y = 0; y < ROWS; y++) {
+      if (g[y * COLS] === c) {
+        vis[y * COLS] = 1;
+        qx[tail] = 0; qy[tail] = y; tail++;
+      }
+    }
+    var reached = false;
+    while (head < tail) {
+      var x = qx[head], yy = qy[head]; head++;
+      if (x === COLS - 1) { reached = true; break; }
+      for (var d = 0; d < 8; d++) {
+        var nx = x + DX[d], ny = yy + DY[d];
+        if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) continue;
+        var ni = ny * COLS + nx;
+        if (vis[ni]) continue;
+        if (g[ni] !== c) continue;
+        vis[ni] = 1;
+        qx[tail] = nx; qy[tail] = ny; tail++;
+      }
+    }
+    if (!reached) continue;
+
+    var cnt = 0;
+    for (i = 0; i < g.length; i++) {
+      if (vis[i]) { g[i] = EMPTY; cnt++; }
+    }
+    if (cnt > 0) {
+      score += cnt * 10;
+      updateScore();
+      any = true;
+    }
+  }
+  if (any) boardVersion++;
+  return any;
+}
+
+/* ---------------------------------------------------------------- 7. 渲染 */
+
+var ca = document.getElementById('gameCanvas');
+var ct = ca.getContext('2d');
+var pr = document.getElementById('previewCanvas');
+var pt = pr.getContext('2d');
+ca.width = W; ca.height = H;
+pr.width = 64; pr.height = 48;
+
+/* 复用同一块 ImageData —— 原版每帧 createImageData 分配 800KB，60fps 即 48MB/s 垃圾 */
+var img = ct.createImageData(W, H);
+var pix = new Uint32Array(img.data.buffer);
+
+/* 静态背景（底色 + 噪点 + 网格线），只算一次 */
+var bg = new Uint32Array(W * H);
+
+/* disp = 本帧想显示什么；painted = 屏幕上当前是什么；两者不同才重绘 */
+var disp = new Uint32Array(COLS * ROWS);
+var painted = new Uint32Array(COLS * ROWS);
+
+var previewDirty = true;
+
+function buildBackground() {
+  var base = packRGB(BG_R, BG_G, BG_B);
+  bg.fill(base);
+
+  var dot = packRGB(25, 25, 39);
+  for (var y = 0; y < ROWS; y++) {
+    for (var x = 0; x < COLS; x++) {
+      if ((((x * 31) ^ (y * 17)) % 37) === 0) {
+        bg[(y * PS) * W + x * PS] = dot;
+      }
+    }
+  }
+
+  var line = packRGB(31, 31, 43);
+  for (y = 0; y < ROWS; y++) {
+    if (y % CELL === 0) {
+      var py = y * PS, rowBase = py * W;
+      for (x = 0; x < W; x++) bg[rowBase + x] = line;
+    }
+  }
+  for (x = 0; x < COLS; x++) {
+    if (x % CELL === 0) {
+      var px = x * PS;
+      for (y = 0; y < H; y++) bg[y * W + px] = line;
+    }
+  }
+}
+
+/* 画一个 4×4 粒子格：code=0 从背景恢复，1..NCOL 正常色，>NCOL 幽灵色 */
+function drawCell(x, y, code) {
+  var o = (y * PS) * W + x * PS;
+  var dy, p, k;
+  if (code === EMPTY) {
+    for (dy = 0; dy < PS; dy++) {
+      p = o + dy * W;
+      for (k = 0; k < PS; k++) pix[p + k] = bg[p + k];
+    }
+  } else {
+    var isGhost = code > NCOL;
+    var ci = (isGhost ? code - NCOL : code) - 1;
+    var c32 = (isGhost ? PAL_GHOST : PAL)[ci * SHADES + (((x * 13) ^ (y * 7)) & (SHADES - 1))];
+    for (dy = 0; dy < PS; dy++) {
+      p = o + dy * W;
+      pix.fill(c32, p, p + PS);
+    }
+  }
+}
+
+/* 只重绘与上一帧不同的格子 —— 性能提升主要来自这里 */
+function flushDirty() {
+  var i = 0;
+  for (var y = 0; y < ROWS; y++) {
+    for (var x = 0; x < COLS; x++, i++) {
+      var v = disp[i];
+      if (v !== painted[i]) {
+        drawCell(x, y, v);
+        painted[i] = v;
+      }
+    }
+  }
+}
+
+var ghostKey = -1, ghostY = -1;
+
+function render() {
+  disp.set(g);                     // 原生 memcpy，51KB
+
+  if (active && running && !paused) {
+    var s = active.s, cells = s.c, k, bx, by, dy, dx, x, y, rb, idx;
+
+    /* 落点预览：只在方块位置/形状或棋盘变化时重算 */
+    var key = boardVersion * 1000000 + s.n.charCodeAt(0) * 100000 + active.gx * 1000 + active.gy;
+    if (key !== ghostKey) {
+      ghostY = ghostDropY();
+      ghostKey = key;
+    }
+    if (ghostY !== active.gy) {
+      for (k = 0; k < cells.length; k++) {
+        bx = (active.gx + cells[k][0]) * CELL;
+        by = (ghostY + cells[k][1]) * CELL;
+        for (dy = 0; dy < CELL; dy++) {
+          y = by + dy;
+          if (y < 0 || y >= ROWS) continue;
+          rb = y * COLS;
+          for (dx = 0; dx < CELL; dx++) {
+            x = bx + dx;
+            if (x < 0 || x >= COLS) continue;
+            idx = rb + x;
+            if (disp[idx] === EMPTY) disp[idx] = active.co + NCOL;
+          }
+        }
+      }
+    }
+
+    /* 当前方块本体 */
+    for (k = 0; k < cells.length; k++) {
+      bx = (active.gx + cells[k][0]) * CELL;
+      by = (active.gy + cells[k][1]) * CELL;
+      for (dy = 0; dy < CELL; dy++) {
+        y = by + dy;
+        if (y < 0 || y >= ROWS) continue;
+        rb = y * COLS;
+        for (dx = 0; dx < CELL; dx++) {
+          x = bx + dx;
+          if (x < 0 || x >= COLS) continue;
+          disp[rb + x] = active.co;
+        }
+      }
+    }
+  }
+
+  flushDirty();
+  ct.putImageData(img, 0, 0);
+  drawPreview();
+}
+
+/* 预览只在下一个方块变化时重画（原版每帧都清空重画） */
+function drawPreview() {
+  if (!previewDirty) return;
+  previewDirty = false;
+  pt.clearRect(0, 0, 64, 48);
+  if (!nextShape) return;
+  var rgb = COLORS[nextColor - 1];
+  pt.fillStyle = 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+  var cs = 10, tw = nextShape.w * cs, th = nextShape.h * cs;
+  var ox = (64 - tw) / 2, oy = (48 - th) / 2;
+  for (var i = 0; i < nextShape.c.length; i++) {
+    pt.fillRect(ox + nextShape.c[i][0] * cs + 1, oy + nextShape.c[i][1] * cs + 1, cs - 2, cs - 2);
+  }
+}
+
+/* ---------------------------------------------------------------- 8. UI */
+
+var scoreEl = document.getElementById('scoreDisplay');
+var bestEl = document.getElementById('bestDisplay');
+var startOverlay = document.getElementById('startOverlay');
+var pauseOverlay = document.getElementById('pauseOverlay');
+var overOverlay = document.getElementById('gameOverOverlay');
+var finalScoreEl = document.getElementById('finalScore');
+var bestLineEl = document.getElementById('bestLine');
+
+var BEST_KEY = 'sand-tetris-best';
+var best = 0;
+try { best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { best = 0; }
+
+function showBest() { bestEl.textContent = best > 0 ? ('最高 ' + best) : ''; }
+showBest();
+
+var scoreTimer = null;
+function updateScore() {
+  scoreEl.textContent = score;
+  scoreEl.classList.add('score-pop');
+  if (scoreTimer) clearTimeout(scoreTimer);
+  scoreTimer = setTimeout(function () { scoreEl.classList.remove('score-pop'); }, 250);
+}
+
+function showGameOver() {
+  if (score > best) {
+    best = score;
+    try { localStorage.setItem(BEST_KEY, String(best)); } catch (e) {}
+    bestLineEl.textContent = '🎉 新纪录！';
+  } else {
+    bestLineEl.textContent = '最高纪录 ' + best;
+  }
+  showBest();
+  finalScoreEl.textContent = score;
+  overOverlay.classList.remove('hidden');
+}
+
+function reset() {
+  g.fill(EMPTY);
+  pix.set(bg);
+  painted.fill(0);
+  disp.fill(0);
+  score = 0;
+  dropInterval = DROP_INIT;
+  running = true;
+  over = false;
+  paused = false;
+  bag = [];
+  active = null;
+  sandDirty = false;
+  ghostKey = -1;
+  boardVersion++;
+  overOverlay.classList.add('hidden');
+  pauseOverlay.classList.add('hidden');
+  updateScore();
+  nextShape = SHAPES[nextFromBag()];
+  nextColor = randomColor();
+  previewDirty = true;
+  spawn();
+}
+
+/* ---------------------------------------------------------------- 9. 输入 */
+
+var keysDown = {};
+var keyTimers = {};
+
+function startHoldRepeat(key, fn) {
+  stopHoldRepeat(key);
+  keyTimers[key] = {
+    t: setTimeout(function () {
+      keyTimers[key].r = setInterval(fn, 55);
+    }, 160),
+    r: null
+  };
+}
+function stopHoldRepeat(key) {
+  var h = keyTimers[key];
+  if (h) {
+    clearTimeout(h.t);
+    if (h.r) clearInterval(h.r);
+    delete keyTimers[key];
+  }
+}
+
+function onKeyDown(e) {
+  var k = e.key;
+  var isRestart = (k === 'r' || k === 'R' || k === 'Enter');
+
+  if (k === 'p' || k === 'P' || k === 'Escape') {
+    if (running && !over) togglePause();
+    return;
+  }
+  if (over && isRestart) { reset(); return; }
+  if (!running) {
+    if (isRestart || k === ' ') startGame();
+    return;
+  }
+  if (paused) return;
+  if (keysDown[k]) return;
+  keysDown[k] = true;
+
+  switch (k) {
+    case 'ArrowLeft': case 'a': case 'A':
+      e.preventDefault(); move(-1); startHoldRepeat(k, function () { move(-1); }); break;
+    case 'ArrowRight': case 'd': case 'D':
+      e.preventDefault(); move(1); startHoldRepeat(k, function () { move(1); }); break;
+    case 'ArrowDown': case 's': case 'S':
+      e.preventDefault(); dropInterval = SOFT_DROP; dropAcc = dropInterval; break;
+    case 'ArrowUp': case 'w': case 'W':
+      e.preventDefault(); rotate(); break;
+    case ' ':
+      e.preventDefault(); hardDrop(); break;
+  }
+}
+
+function onKeyUp(e) {
+  var k = e.key;
+  keysDown[k] = false;
+  stopHoldRepeat(k);
+  if (k === 'ArrowDown' || k === 's' || k === 'S') {
+    dropInterval = Math.max(DROP_MIN, DROP_INIT - score * 0.3);
+  }
+}
+
+document.addEventListener('keydown', onKeyDown);
+document.addEventListener('keyup', onKeyUp);
+/* 防止空格/方向键滚动页面 */
+window.addEventListener('keydown', function (e) {
+  if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) !== -1) e.preventDefault();
+}, { passive: false });
+
+/* 触屏按钮：按下立即响应，按住 160ms 后连发 */
+function bindButton(id, fn, repeatFn) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  var timer = null;
+  el.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    fn();
+    if (repeatFn) {
+      timer = setTimeout(function () { timer = setInterval(repeatFn, 55); }, 160);
+    }
+  });
+  function stop() {
+    if (timer) { clearTimeout(timer); clearInterval(timer); timer = null; }
+  }
+  el.addEventListener('pointerup', stop);
+  el.addEventListener('pointercancel', stop);
+  el.addEventListener('pointerleave', stop);
+}
+bindButton('btnLeft', function () { move(-1); }, function () { move(-1); });
+bindButton('btnRight', function () { move(1); }, function () { move(1); });
+bindButton('btnRotate', function () { rotate(); });
+bindButton('btnDrop', function () { hardDrop(); });
+bindButton('btnDown', function () {
+  if (active && running) { dropInterval = SOFT_DROP; dropAcc = dropInterval; }
+}, function () { softStep(); });
+(function () {
+  var bd = document.getElementById('btnDown');
+  if (bd) bd.addEventListener('pointerup', function () {
+    dropInterval = Math.max(DROP_MIN, DROP_INIT - score * 0.3);
+  });
+})();
+
+/* ---- 手柄 ---- */
+var gpState = {};
+function pollGamepads() {
+  if (!navigator.getGamepads) return;
+  var pads = navigator.getGamepads();
+  for (var i = 0; i < pads.length; i++) {
+    var gp = pads[i];
+    if (!gp) continue;
+    var ax = gp.axes[0] || 0;
+    var left = ax < -0.5 || !!(gp.buttons[14] && gp.buttons[14].pressed);
+    var right = ax > 0.5 || !!(gp.buttons[15] && gp.buttons[15].pressed);
+    var down = !!(gp.buttons[13] && gp.buttons[13].pressed) || !!(gp.buttons[1] && gp.buttons[1].pressed);
+    var rotB = !!(gp.buttons[12] && gp.buttons[12].pressed) || !!(gp.buttons[0] && gp.buttons[0].pressed);
+    var dropB = !!(gp.buttons[2] && gp.buttons[2].pressed) || !!(gp.buttons[4] && gp.buttons[4].pressed);
+    /* 注意：原版这里把局部变量也命名为 rst，遮蔽了外层 rst() 函数，
+       导致手柄按 Start 结束时抛 "rst is not a function"。改名修掉。 */
+    var startB = !!(gp.buttons[9] && gp.buttons[9].pressed);
+
+    if (startB && !gpState.start) {
+      gpState.start = true;
+      if (over) reset();
+      else if (!startOverlay.classList.contains('hidden')) startGame();
+      else if (running) togglePause();
+    } else if (!startB) gpState.start = false;
+
+    if (!running || paused || over) continue;
+
+    if (left && !gpState.l) { gpState.l = true; move(-1); } else if (!left) gpState.l = false;
+    if (right && !gpState.r) { gpState.r = true; move(1); } else if (!right) gpState.r = false;
+    if (rotB && !gpState.rot) { gpState.rot = true; rotate(); } else if (!rotB) gpState.rot = false;
+    if (dropB && !gpState.drop) { gpState.drop = true; hardDrop(); } else if (!dropB) gpState.drop = false;
+    if (down) { dropInterval = SOFT_DROP; dropAcc = dropInterval; gpState.down = true; }
+    else if (gpState.down) {
+      dropInterval = Math.max(DROP_MIN, DROP_INIT - score * 0.3);
+      gpState.down = false;
+    }
+  }
+}
+
+/* ---- 暂停 ---- */
+function togglePause() {
+  if (!running || over) return;
+  paused = !paused;
+  if (paused) pauseOverlay.classList.remove('hidden');
+  else pauseOverlay.classList.add('hidden');
+}
+/* 切后台自动暂停，回来别让方块瞬间砸下来 */
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden && running && !over && !paused) togglePause();
+});
+pauseOverlay.addEventListener('pointerdown', function (e) {
+  e.preventDefault();
+  if (paused) togglePause();
+});
+
+/* ---- 开始 / 重开 ---- */
+var startBtn = document.getElementById('startBtn');
+var restartBtn = document.getElementById('restartBtn');
+function startGame() {
+  startOverlay.classList.add('hidden');
+  reset();
+}
+startBtn.addEventListener('click', startGame);
+restartBtn.addEventListener('click', reset);
+ca.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+
+/* ---------------------------------------------------------------- 10. 主循环 */
+
+var dropInterval = DROP_INIT;
+var dropAcc = 0, simAcc = 0;
+var lastTs = 0;
+
+function loop(ts) {
+  if (!lastTs) lastTs = ts;
+  var dt = ts - lastTs;
+  lastTs = ts;
+  if (dt > 200) dt = 200;      // 切后台回来别一次补太多
+
+  pollGamepads();
+
+  if (running && !paused && !over) {
+    if (active) {
+      dropAcc += dt;
+      while (dropAcc >= dropInterval) {
+        dropAcc -= dropInterval;
+        if (!softStep()) {
+          lockPiece();
+          if (over) break;
+        }
+      }
+      if (!over) {
+        simAcc += dt;
+        if (simAcc > 120) simAcc = 120;
+        while (simAcc >= SIM_MS) { simAcc -= SIM_MS; simulate(); }
+      }
+    } else {
+      spawn();
+      dropAcc = 0;
+    }
+  }
+
+  render();
+  requestAnimationFrame(loop);
+}
+
+/* ---------------------------------------------------------------- 启动 */
+buildBackground();
+nextShape = SHAPES[nextFromBag()];
+nextColor = randomColor();
+startOverlay.classList.remove('hidden');
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
